@@ -107,7 +107,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 		
 		if (Get-Module -ListAvailable -Name PnP.PowerShell) {
 			Write-Host "PnP PowerShell module found, attempting to connect to 365."
-			$SiteURL = Read-Host "Enter the SharePoint site URL (ex. https://reedevelopment.sharepoint.com/sites/Shared)"
+			$SiteURL = Read-Host "Enter the SharePoint site URL (ex. https://company.sharepoint.com/sites/Shared)"
 			Try {
 				Connect-PnPOnline "$SiteURL" -Interactive
 				Write-Host "Successfully connected to 365 Cloud."
@@ -142,6 +142,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 			if ($response -ne "Y") { exit }
 			
 			#Actually restore the items. Thanks BingGPT for the multithreading.
+			$StartTime = Get-Date
 			$FilesToRestore | ForEach-Object -Parallel {
 				#Need to declare this function again since ForEach-Object -Parallel runs as separate instances and can't access parent script functions.
 				#I tried the $using thing but PowerShell just complains about invalid chars.
@@ -162,7 +163,9 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 				Catch {
 					Write-Log "Failed to restore $($_.LeafName)"
 				}
-			} -ThrottleLimit 4 #Max number of restore instances to run at a time. I've found 4 threads avoids ratelimiting from Microsoft. You can try higher if you want.
+			} -ThrottleLimit 2 #Max number of restore instances to run at a time. I've found 2 threads avoids ratelimiting from Microsoft. You can try higher if you want.
+			$Runtime = $(Get-Date)-$StartTime
+			Write-Log "Finished restoring $($FilesToRestore.count) files in $($Runtime.hours) hours $($Runtime.minutes) minutes $($Runtime.seconds) seconds."
 		}
 		else {
 			Write-Host "Missing PnP.PowerShell module. Attempting install..."
@@ -179,7 +182,7 @@ if ($PSVersionTable.PSVersion.Major -ge 7) {
 		#Running the script again allows the user to run this again for another user in the same domain without having to login again.
 		$choice = $Host.UI.PromptForChoice("Rerun the script? (y/n)","",$choices,0)
 		if ( $choice -ne 0 ) {
-			break
+			exit
 		}
 	}
 }
